@@ -1,6 +1,4 @@
 .stack-work/
 *.cabal
 
-set-env.sh
-
 *.aes
