@@ -10,10 +10,13 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS -Wno-unused-top-binds #-}
 
-import           Control.Monad.IO.Class as Monad.IO.Class
+import           Data.Aeson ((.=))
+import qualified Data.Aeson as Aeson
+import qualified Control.Monad.IO.Class as Monad.IO.Class
 import qualified Control.Monad.Logger as Monad.Logger
 import qualified Control.Monad.Trans.Resource as Monad.Trans.Resource
 import           Data.ByteString (ByteString)
+import           Data.Semigroup ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
@@ -40,7 +43,9 @@ data FantasticSpoon = FantasticSpoon Persist.Postgresql.ConnectionPool
 Yesod.mkYesod "FantasticSpoon" [Yesod.parseRoutes|
 / HomeR GET
 /user/#UserId UserR GET
+/user CreateUserR POST
 |]
+-- /static StaticR Static getStatic
 
 instance Yesod.Yesod FantasticSpoon
 
@@ -68,15 +73,24 @@ getUserR userId = do
   user <- Yesod.runDB $ Yesod.get404 userId
   return $ show user
 
+postCreateUserR :: Yesod.HandlerFor FantasticSpoon Aeson.Value
+postCreateUserR = do
+  return $ Aeson.object ["message" .= Aeson.String "Post successful!"]
+
 main :: IO ()
 main = do
   connectionString    <- fmap (Text.Encoding.encodeUtf8 . Text.pack)  $ Environment.getEnv "DATABASE_URL"
   openConnectionCount <- fmap (Text.Read.read @Int)                   $ Environment.getEnv "DATABASE_CONNECTION_COUNT"
   port                <- fmap (Text.Read.read @Int)                   $ Environment.getEnv "PORT"
-  Monad.Logger.runStderrLoggingT
-    $ Persist.Postgresql.withPostgresqlPool connectionString openConnectionCount
-    $ \pool -> Monad.IO.Class.liftIO $ do
-      Monad.Trans.Resource.runResourceT
-        $ flip Persist.Postgresql.runSqlPool pool
-        $ Persist.Postgresql.runMigration migrateAll
-      Yesod.warp port $ FantasticSpoon pool
+  Monad.Logger.runStderrLoggingT $ do
+    $(Monad.Logger.logInfo) $ "Open connection count: " <> (Text.pack . show) openConnectionCount
+    $(Monad.Logger.logInfo) $ "Port: " <> (Text.pack . show) port
+
+    Persist.Postgresql.withPostgresqlPool connectionString openConnectionCount $ \pool -> Monad.IO.Class.liftIO $ do
+      let
+        runMigrationAction = Persist.Postgresql.runMigration migrateAll
+        runMigrationWithPool = Persist.Postgresql.runSqlPool runMigrationAction pool
+      Monad.Trans.Resource.runResourceT runMigrationWithPool
+
+      let application = FantasticSpoon pool
+      Yesod.warp port application
