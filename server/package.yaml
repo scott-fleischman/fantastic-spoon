@@ -1,0 +1,21 @@
+name: fantastic-spoon
+version: 0.1.0
+
+dependencies:
+- aeson
+- base
+- bytestring
+- cryptonite
+- persistent
+- persistent-sqlite
+- persistent-template
+- text
+- yesod
+- yesod-auth
+
+ghc-options:
+- -Wall
+- -Werror
+
+executable:
+  main: Main.hs
