@@ -2,3 +2,5 @@
 *.cabal
 
 set-env.sh
+
+*.aes
