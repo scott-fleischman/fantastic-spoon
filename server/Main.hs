@@ -33,7 +33,7 @@ User
 
 main :: IO ()
 main = do
-  connectionString <- Environment.getEnv "POSTGRES_CONNECTION"
+  connectionString <- Environment.getEnv "DATABASE_URL"
   let connectionStringBytes = (Text.Encoding.encodeUtf8 . Text.pack) connectionString
   Monad.Logger.runStderrLoggingT $ Persist.Postgresql.withPostgresqlPool connectionStringBytes 10 $ \pool -> Monad.IO.Class.liftIO $ do
     flip Persist.Postgresql.runSqlPersistMPool pool $ do
