@@ -12,10 +12,13 @@ import           Control.Monad.IO.Class as Monad.IO.Class
 import qualified Control.Monad.Logger as Monad.Logger
 import           Data.ByteString (ByteString)
 import           Data.Text (Text)
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text.Encoding
 import           Database.Persist ((==.))
 import qualified Database.Persist as Persist
 import qualified Database.Persist.Postgresql as Persist.Postgresql
 import qualified Database.Persist.TH as Persist.TH
+import qualified System.Environment as Environment
 
 Persist.TH.share
   [Persist.TH.mkPersist Persist.TH.sqlSettings, Persist.TH.mkMigrate "migrateAll"]
@@ -28,15 +31,15 @@ User
   deriving Show
 |]
 
-connStr :: Persist.Postgresql.ConnectionString
-connStr = "host=localhost dbname=test user=test password=test port=5432"
-
 main :: IO ()
-main = Monad.Logger.runStderrLoggingT $ Persist.Postgresql.withPostgresqlPool connStr 10 $ \pool -> Monad.IO.Class.liftIO $ do
-  flip Persist.Postgresql.runSqlPersistMPool pool $ do
-    Persist.Postgresql.runMigration migrateAll
+main = do
+  connectionString <- Environment.getEnv "POSTGRES_CONNECTION"
+  let connectionStringBytes = (Text.Encoding.encodeUtf8 . Text.pack) connectionString
+  Monad.Logger.runStderrLoggingT $ Persist.Postgresql.withPostgresqlPool connectionStringBytes 10 $ \pool -> Monad.IO.Class.liftIO $ do
+    flip Persist.Postgresql.runSqlPersistMPool pool $ do
+      Persist.Postgresql.runMigration migrateAll
 
-    userId <- Persist.insert $ User "scott" "pwd" 26
-    scott <- Persist.selectList [UserId ==. userId] []
-    Monad.IO.Class.liftIO $ print scott
-    Persist.delete userId
+      userId <- Persist.insert $ User "scott" "pwd" 26
+      scott <- Persist.selectList [UserId ==. userId] []
+      Monad.IO.Class.liftIO $ print scott
+      Persist.delete userId
