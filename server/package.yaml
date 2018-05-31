@@ -6,6 +6,7 @@ dependencies:
 - base
 - bytestring
 - cryptonite
+- http-types
 - monad-logger
 - persistent
 - persistent-postgresql
@@ -14,6 +15,7 @@ dependencies:
 - text
 - yesod
 - yesod-auth
+- yesod-static
 
 ghc-options:
 - -Wall
