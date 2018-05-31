@@ -8,12 +8,13 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS -Wno-unused-top-binds #-}
 
-import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.IO.Class as Monad.IO.Class
+import qualified Control.Monad.Logger as Monad.Logger
 import           Data.ByteString (ByteString)
 import           Data.Text (Text)
 import           Database.Persist ((==.))
 import qualified Database.Persist as Persist
-import qualified Database.Persist.Sqlite as Persist.Sqlite
+import qualified Database.Persist.Postgresql as Persist.Postgresql
 import qualified Database.Persist.TH as Persist.TH
 
 Persist.TH.share
@@ -27,9 +28,15 @@ User
   deriving Show
 |]
 
+connStr :: Persist.Postgresql.ConnectionString
+connStr = "host=localhost dbname=test user=test password=test port=5432"
+
 main :: IO ()
-main = Persist.Sqlite.runSqlite ":memory:" $ do
-  Persist.Sqlite.runMigration migrateAll
-  _ <- Persist.insert $ User "scott" "pwd" 26
-  scott <- Persist.selectList [UserName ==. "scott"] []
-  liftIO $ print scott
+main = Monad.Logger.runStderrLoggingT $ Persist.Postgresql.withPostgresqlPool connStr 10 $ \pool -> Monad.IO.Class.liftIO $ do
+  flip Persist.Postgresql.runSqlPersistMPool pool $ do
+    Persist.Postgresql.runMigration migrateAll
+
+    userId <- Persist.insert $ User "scott" "pwd" 26
+    scott <- Persist.selectList [UserId ==. userId] []
+    Monad.IO.Class.liftIO $ print scott
+    Persist.delete userId

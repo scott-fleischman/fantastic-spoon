@@ -6,8 +6,9 @@ dependencies:
 - base
 - bytestring
 - cryptonite
+- monad-logger
 - persistent
-- persistent-sqlite
+- persistent-postgresql
 - persistent-template
 - text
 - yesod
