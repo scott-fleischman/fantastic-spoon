@@ -12,6 +12,7 @@ dependencies:
 - persistent
 - persistent-postgresql
 - persistent-template
+- random
 - resourcet
 - text
 - yesod
