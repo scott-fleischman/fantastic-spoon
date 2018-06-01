@@ -33,8 +33,6 @@ import qualified System.Environment as Environment
 import qualified System.Random as Random
 import qualified Text.Read
 import qualified Yesod
-import           Yesod.Static (Static)
-import qualified Yesod.Static
 
 Persist.TH.share
   [Persist.TH.mkPersist Persist.TH.sqlSettings, Persist.TH.mkMigrate "migrateAll"]
@@ -52,15 +50,13 @@ instance Aeson.ToJSON User
 instance Aeson.FromJSON User
 
 data App = App
-  { appStatic :: Static
-  , appConnectionPool :: Persist.Postgresql.ConnectionPool
+  { appConnectionPool :: Persist.Postgresql.ConnectionPool
   }
 
 Yesod.mkYesod "App" [Yesod.parseRoutes|
 / HomeR GET POST
 /ages AgesR GET
 /register RegisterR GET POST
-/static StaticR Static appStatic
 |]
 
 instance Yesod.Yesod App
@@ -81,6 +77,14 @@ instance Yesod.ToTypedContent RawHtml where
 instance Yesod.HasContentType RawHtml where
   getContentType _ = Yesod.typeHtml
 
+bootstrapStyles :: String
+bootstrapStyles = [String.Interpolate.i|
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
+|]
+
 getHomeR :: Yesod.HandlerFor App Yesod.Html
 getHomeR = do
   maybeUserId <- tryGetUserId
@@ -90,16 +94,21 @@ getHomeR = do
   Yesod.sendResponseStatus HTTP.Types.status200 $ RawHtml [String.Interpolate.i|<!DOCTYPE html>
 <meta charset="utf-8">
 <head>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+#{bootstrapStyles}
 </head>
 <body>
-<div style="max-width: 600px; margin: 0 auto;">
-<img src="static/images/wood-spoon-sm.jpg" style="float: left; margin: 0 0 1em 1em;">
-<div style="font-family: sans serif; font-size: 32px">Fantastic Spoon 🥄</div>
+<div class="container" style="width: 800px">
+<h1>Fantastic Spoon 🥄</h1>
 <form method="post">
-  <div><div style="display:inline-block;min-width: 80px;">Name</div><input type="text" name="name"><div>
-  <div><div style="display:inline-block;min-width: 80px;">Password</div><input type="password" name="password"><div>
-  <div><input type="submit" value="Sign in"><div>
+  <div class="form-group">
+    <label for="userName1">Name</label>
+    <input type="text" class="form-control" id="userName1" placeholder="Enter name" name="name">
+  </div>
+  <div class="form-group">
+    <label for="inputPassword1">Password</label>
+    <input type="password" class="form-control" id="inputPassword1" placeholder="Password" name="password">
+  </div>
+  <button type="submit" class="btn btn-primary">Sign in</button>
 </form>
 </div>
 </body>
@@ -176,7 +185,8 @@ getAgesR = do
   Yesod.sendResponseStatus HTTP.Types.status200 $ RawHtml [String.Interpolate.i|<!DOCTYPE html>
 <meta charset="utf-8">
 <head>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+#{bootstrapStyles}
+<script src="https://cdn.plot.ly/plotly-1.38.1.min.js"></script>
 </head>
 <body>
 <div id="myDiv"></div>
@@ -214,17 +224,27 @@ getRegisterR = do
   Yesod.sendResponseStatus HTTP.Types.status200 $ RawHtml [String.Interpolate.i|<!DOCTYPE html>
 <meta charset="utf-8">
 <head>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+#{bootstrapStyles}
 </head>
 <body>
-<div style="max-width: 600px; margin: 0 auto;">
-<img src="static/images/wood-spoon-sm.jpg" style="float: left; margin: 0 0 1em 1em;">
-<div style="font-family: sans serif; font-size: 32px">Register for Fantastic Spoon 🥄</div>
+<div class="container" style="width: 800px">
+<h1>Register 🥄</h1>
 <form method="post">
-  <div><div style="display:inline-block;min-width: 80px;">Name</div><input type="text" name="name"><div>
-  <div><div style="display:inline-block;min-width: 80px;">Password</div><input type="password" name="password"><div>
-  <div><div style="display:inline-block;min-width: 80px;">Age</div><input type="text" name="age"><div>
-  <div><input type="submit" value="Register"><div>
+  <div class="form-group">
+    <label for="userName1">Name</label>
+    <input type="text" class="form-control" id="userName1" aria-describedby="nameHelp" placeholder="Enter name" name="name">
+    <small id="nameHelp" class="form-text text-muted">We'll never share your name with anyone else.</small>
+  </div>
+  <div class="form-group">
+    <label for="inputPassword1">Password</label>
+    <input type="password" class="form-control" id="inputPassword1" placeholder="Password" name="password">
+  </div>
+  <div class="form-group">
+    <label for="userAge1">Name</label>
+    <input type="text" class="form-control" id="userAge1" aria-describedby="ageHelp" placeholder="Enter age" name="age">
+    <small id="ageHelp" class="form-text text-muted">We show a histogram of ages of all users in aggregate.</small>
+  </div>
+  <button type="submit" class="btn btn-primary">Register</button>
 </form>
 </div>
 </body>
@@ -282,11 +302,5 @@ main = do
         runMigrationWithPool = Persist.Postgresql.runSqlPool runMigrationAction pool
       Monad.Trans.Resource.runResourceT runMigrationWithPool
 
-      let embeddedStatic = $(Yesod.Static.embed "../static")
-      let
-        application =
-          App
-          { appStatic = embeddedStatic
-          , appConnectionPool = pool
-          }
+      let application = App { appConnectionPool = pool }
       Yesod.warp port application
