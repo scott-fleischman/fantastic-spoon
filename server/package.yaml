@@ -7,6 +7,7 @@ dependencies:
 - bytestring
 - cryptonite
 - http-types
+- interpolate
 - monad-logger
 - persistent
 - persistent-postgresql
