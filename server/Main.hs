@@ -51,21 +51,21 @@ User
 instance Aeson.ToJSON User
 instance Aeson.FromJSON User
 
-data FantasticSpoon = FantasticSpoon
+data App = App
   { appStatic :: Static
   , appConnectionPool :: Persist.Postgresql.ConnectionPool
   }
 
-Yesod.mkYesod "FantasticSpoon" [Yesod.parseRoutes|
+Yesod.mkYesod "App" [Yesod.parseRoutes|
 / HomeR GET
 /user CreateUserR POST
 /static StaticR Static appStatic
 |]
 
-instance Yesod.Yesod FantasticSpoon
+instance Yesod.Yesod App
 
-instance Yesod.YesodPersist FantasticSpoon where
-  type YesodPersistBackend FantasticSpoon = Persist.Postgresql.SqlBackend
+instance Yesod.YesodPersist App where
+  type YesodPersistBackend App = Persist.Postgresql.SqlBackend
 
   runDB action = do
     app <- Yesod.getYesod
@@ -80,7 +80,7 @@ instance Yesod.ToTypedContent RawHtml where
 instance Yesod.HasContentType RawHtml where
   getContentType _ = Yesod.typeHtml
 
-getHomeR :: Yesod.HandlerFor FantasticSpoon Yesod.Html
+getHomeR :: Yesod.HandlerFor App Yesod.Html
 getHomeR = do
   users <- Yesod.runDB $ Persist.selectList [] [Persist.Asc UserAge]
   let
@@ -131,7 +131,7 @@ Plotly.newPlot('myDiv', data, layout);
 </body>
   |]
 
-postCreateUserR :: Yesod.HandlerFor FantasticSpoon Aeson.Value
+postCreateUserR :: Yesod.HandlerFor App Aeson.Value
 postCreateUserR = do
   userResult <- Yesod.parseCheckJsonBody
   user :: User <-
@@ -180,7 +180,7 @@ main = do
       let embeddedStatic = $(Yesod.Static.embed "../static")
       let
         application =
-          FantasticSpoon
+          App
           { appStatic = embeddedStatic
           , appConnectionPool = pool
           }
