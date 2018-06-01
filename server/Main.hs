@@ -125,6 +125,20 @@ getSignOutR = do
   Yesod.clearSession
   noUserRedirect
 
+setAlert :: Text -> Yesod.HandlerFor App ()
+setAlert alert = Yesod.setSession "alert" alert
+
+getAlertHtml :: Yesod.HandlerFor App String
+getAlertHtml = do
+  maybeAlert <- Yesod.lookupSession "alert"
+  case maybeAlert of
+    Nothing -> return ""
+    Just alert -> do
+      Yesod.deleteSession "alert"
+      return [String.Interpolate.i|
+<div class="alert alert-warning" role="alert">#{alert}</div>
+|]
+
 getHomeR :: Yesod.HandlerFor App Yesod.Html
 getHomeR = do
   maybeUserId <- tryGetUserId
@@ -132,6 +146,7 @@ getHomeR = do
     Just _ -> Yesod.redirect AgesR
     Nothing -> return ()
   navBar <- makeNavBar
+  alertHtml <- getAlertHtml
   render <- Yesod.getUrlRender
   let registerLink = render RegisterR
   Yesod.sendResponseStatus HTTP.Types.status200 $ RawHtml [String.Interpolate.i|<!DOCTYPE html>
@@ -143,6 +158,7 @@ getHomeR = do
 #{navBar}
 <div class="container" style="width: 800px">
 <h1>Fantastic Spoon 🥄</h1>
+#{alertHtml}
 <p>Sign in with your name and password below or <a href="#{registerLink}">Register</a> a new account.</p>
 <form method="post">
   <div class="form-group">
@@ -168,18 +184,27 @@ postHomeR = do
   maybePassword <- Yesod.lookupPostParam "password"
   (name, password) <-
     case (maybeName, maybePassword) of
-      (Just name, Just password) -> return (name, password)
-      _ -> noUserRedirect
+      (Just name, Just password)
+        | (not . Text.null) name
+        , (not . Text.null) password
+        -> return (name, password)
+      _ -> do
+        setAlert "Please enter both name and password."
+        noUserRedirect
 
   users <- Yesod.runDB $ Persist.selectList [UserName ==. name] []
   user <-
     case users of
       [user] -> return user
-      _ -> noUserRedirect
+      _ -> do
+        setAlert "User not found."
+        noUserRedirect
 
   if (userPassword . Persist.entityVal) user == Just password
     then return ()
-    else noUserRedirect
+    else do
+      setAlert "Invalid password."
+      noUserRedirect
 
   setSessionUserId $ Persist.entityKey user
   Yesod.redirect AgesR
@@ -269,6 +294,7 @@ Plotly.newPlot('myDiv', data, layout);
 getRegisterR :: Yesod.HandlerFor App Yesod.Html
 getRegisterR = do
   navBar <- makeNavBar
+  alertHtml <- getAlertHtml
   Yesod.sendResponseStatus HTTP.Types.status200 $ RawHtml [String.Interpolate.i|<!DOCTYPE html>
 <meta charset="utf-8">
 <head>
@@ -278,6 +304,7 @@ getRegisterR = do
 #{navBar}
 <div class="container" style="width: 800px">
 <h1>Register 🥄</h1>
+#{alertHtml}
 <form method="post">
   <div class="form-group">
     <label for="userName1">Name</label>
@@ -306,12 +333,28 @@ postRegisterR = do
   maybeAge <- Yesod.lookupPostParam "age"
   (name, password, ageText) <-
     case pure (,,) <*> maybeName <*> maybePassword <*> maybeAge of
-      Just (name, password, ageText) -> return (name, password, ageText)
-      _ -> Yesod.redirect RegisterR
+      Just (name, password, ageText)
+        | (not . Text.null) name
+        , (not . Text.null) password
+        , (not . Text.null) ageText
+        -> return (name, password, ageText)
+      _ -> do
+        setAlert "Please fill out all fields."
+        Yesod.redirect RegisterR
   age <-
     case Text.Read.readMaybe @Int (Text.unpack ageText) of
       Just age -> return age
-      _ -> Yesod.redirect RegisterR
+      _ -> do
+        setAlert "Invalid age."
+        Yesod.redirect RegisterR
+
+  existingUsers <- Yesod.runDB $ Persist.selectList [UserName ==. name] []
+  case existingUsers of
+    [] -> return ()
+    (_ : _) -> do
+      setAlert "Name already exists."
+      Yesod.redirect RegisterR
+
   let user = User name (Just password) age
   userId <- Yesod.runDB $ Persist.insert user
   setSessionUserId userId
