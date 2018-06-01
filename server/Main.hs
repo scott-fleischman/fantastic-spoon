@@ -143,7 +143,7 @@ getHomeR = do
 #{navBar}
 <div class="container" style="width: 800px">
 <h1>Fantastic Spoon 🥄</h1>
-<p>Sign in with your name and password or click <a href="#{registerLink}">Register</a> above to create a new account.</p>
+<p>Sign in with your name and password below or <a href="#{registerLink}">Register</a> a new account.</p>
 <form method="post">
   <div class="form-group">
     <label for="userName1">Name</label>
@@ -153,7 +153,7 @@ getHomeR = do
     <label for="inputPassword1">Password</label>
     <input type="password" class="form-control" id="inputPassword1" placeholder="Password" name="password">
   </div>
-  <button type="submit" class="btn btn-primary">Sign in</button>
+  <button type="submit" class="btn btn-primary">Sign In</button>
 </form>
 </div>
 </body>
@@ -236,6 +236,7 @@ getAgesR = do
 </head>
 <body>
 #{navBar}
+<h1 style="text-align: center">Ages of Users 🥄</h1>
 <div id="myDiv"></div>
 <script>
 var userAges = #{userAgesJS};
@@ -256,7 +257,6 @@ var trace = {
 };
 var layout = {
   bargap: 0.02,
-  title: "Ages of Users", 
   xaxis: {title: "Age"},
   yaxis: {title: "Count"}
 };
