@@ -12,12 +12,13 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS -Wno-unused-top-binds #-}
 
-import           Data.Aeson ((.=))
-import qualified Data.Aeson as Aeson
 import qualified Control.Monad.IO.Class as Monad.IO
 import qualified Control.Monad.Logger as Monad.Logger
 import qualified Control.Monad.Trans.Reader as Monad.Trans.Reader
 import qualified Control.Monad.Trans.Resource as Monad.Trans.Resource
+import           Data.Aeson ((.=))
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Data.String.Interpolate as String.Interpolate
 import           Data.Semigroup ((<>))
 import           Data.Text (Text)
@@ -41,7 +42,7 @@ Persist.TH.share
   [Persist.TH.persistLowerCase|
 User
   name Text
-  password Text
+  password Text Maybe
   age Int
   UniqueName name
   deriving Show
@@ -57,7 +58,8 @@ data App = App
   }
 
 Yesod.mkYesod "App" [Yesod.parseRoutes|
-/ HomeR GET
+/ HomeR GET POST
+/ages AgesR GET
 /user CreateUserR POST
 /static StaticR Static appStatic
 |]
@@ -82,9 +84,83 @@ instance Yesod.HasContentType RawHtml where
 
 getHomeR :: Yesod.HandlerFor App Yesod.Html
 getHomeR = do
+  maybeUserId <- tryGetUserId
+  case maybeUserId of
+    Just _ -> Yesod.redirect AgesR
+    Nothing -> return ()
+  Yesod.sendResponseStatus HTTP.Types.status200 $ RawHtml [String.Interpolate.i|<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+<div style="max-width: 600px; margin: 0 auto;">
+<img src="static/images/wood-spoon-sm.jpg" style="float: left; margin: 0 0 1em 1em;">
+<div style="font-family: sans serif; font-size: 32px">Fantastic Spoon 🥄</div>
+<form method="post">
+  <div><input type="text" name="name"><div>
+  <div><input type="password" name="password"><div>
+  <div><input type="submit" value="Sign in"><div>
+</form>
+</div>
+</body>
+|]
+
+noUserRedirect :: Yesod.HandlerFor App a
+noUserRedirect = Yesod.redirect HomeR
+
+postHomeR :: Yesod.HandlerFor App ()
+postHomeR = do
+  maybeName <- Yesod.lookupPostParam "name"
+  maybePassword <- Yesod.lookupPostParam "password"
+  (name, password) <-
+    case (maybeName, maybePassword) of
+      (Just name, Just password) -> return (name, password)
+      _ -> noUserRedirect
+
+  users <- Yesod.runDB $ Persist.selectList [UserName ==. name] []
+  user <-
+    case users of
+      [user] -> return user
+      _ -> noUserRedirect
+
+  if (userPassword . Persist.entityVal) user == Just password
+    then return ()
+    else noUserRedirect
+
+  Yesod.setSessionBS sessionUserIdKey $ (ByteString.Lazy.toStrict . Aeson.encode . Persist.entityKey) user
+  Yesod.redirect AgesR
+
+sessionUserIdKey :: Text
+sessionUserIdKey = "userId"
+
+tryGetUserId :: Yesod.HandlerFor App (Maybe UserId)
+tryGetUserId = do
+  maybeUserIdBytes <- Yesod.lookupSessionBS sessionUserIdKey
+  let maybeUserId = maybeUserIdBytes >>= Aeson.decodeStrict @UserId
+  return maybeUserId
+
+requireUserId :: Yesod.HandlerFor App UserId
+requireUserId = do
+  maybeUserId <- tryGetUserId
+  userId <-
+    case maybeUserId of
+      Nothing -> noUserRedirect
+      Just x -> return x
+  return userId
+
+getAgesR :: Yesod.HandlerFor App Yesod.Html
+getAgesR = do
+  userId <- requireUserId
+  maybeCurrentUser <- Yesod.runDB $ Persist.get userId
+  currentUser <-
+    case maybeCurrentUser of
+      Nothing -> noUserRedirect
+      Just x -> return x
+
   users <- Yesod.runDB $ Persist.selectList [] [Persist.Asc UserAge]
   let
-    currentAge = 25 :: Int
+    currentAge = userAge currentUser
     userAges = fmap (userAge . Persist.entityVal) users
     makeJSArray items = Text.concat ["[", Text.intercalate "," items, "]"]
     userAgesJS = makeJSArray $ fmap (Text.pack . show) userAges
@@ -151,7 +227,7 @@ populateUsersIfNeeded = do
   stdGen <- Monad.IO.liftIO Random.getStdGen
   let
     ageRange = (10, 100)
-    fakePassword = "pwd"
+    fakePassword = Just "pwd"
     ages = take (length nameList) (Random.randomRs ageRange stdGen)
     nameAgePairs = zip nameList ages
     users = fmap (\(name, age) -> User name fakePassword age) nameAgePairs

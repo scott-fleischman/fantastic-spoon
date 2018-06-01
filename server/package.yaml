@@ -18,6 +18,7 @@ dependencies:
 - transformers
 - yesod
 - yesod-auth
+- yesod-auth-hashdb
 - yesod-static
 
 ghc-options:
