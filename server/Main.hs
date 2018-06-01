@@ -97,8 +97,8 @@ getHomeR = do
 <img src="static/images/wood-spoon-sm.jpg" style="float: left; margin: 0 0 1em 1em;">
 <div style="font-family: sans serif; font-size: 32px">Fantastic Spoon 🥄</div>
 <form method="post">
-  <div><input type="text" name="name"><div>
-  <div><input type="password" name="password"><div>
+  <div><div style="display:inline-block;min-width: 80px;">Name</div><input type="text" name="name"><div>
+  <div><div style="display:inline-block;min-width: 80px;">Password</div><input type="password" name="password"><div>
   <div><input type="submit" value="Sign in"><div>
 </form>
 </div>
@@ -219,12 +219,11 @@ getRegisterR = do
 <body>
 <div style="max-width: 600px; margin: 0 auto;">
 <img src="static/images/wood-spoon-sm.jpg" style="float: left; margin: 0 0 1em 1em;">
-<div style="font-family: sans serif; font-size: 32px">Fantastic Spoon 🥄</div>
-<div style="font-family: sans serif; font-size: 24px">Register</div>
+<div style="font-family: sans serif; font-size: 32px">Register for Fantastic Spoon 🥄</div>
 <form method="post">
-  <div><input type="text" name="name"><div>
-  <div><input type="password" name="password"><div>
-  <div><input type="text" name="age"><div>
+  <div><div style="display:inline-block;min-width: 80px;">Name</div><input type="text" name="name"><div>
+  <div><div style="display:inline-block;min-width: 80px;">Password</div><input type="password" name="password"><div>
+  <div><div style="display:inline-block;min-width: 80px;">Age</div><input type="text" name="age"><div>
   <div><input type="submit" value="Register"><div>
 </form>
 </div>
