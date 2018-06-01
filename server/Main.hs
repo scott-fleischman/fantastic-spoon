@@ -33,6 +33,8 @@ import qualified System.Environment as Environment
 import qualified System.Random as Random
 import qualified Text.Read
 import qualified Yesod
+import           Yesod.Auth.HashDB (HashDBUser)
+import qualified Yesod.Auth.HashDB
 
 Persist.TH.share
   [Persist.TH.mkPersist Persist.TH.sqlSettings, Persist.TH.mkMigrate "migrateAll"]
@@ -48,6 +50,10 @@ User
 
 instance Aeson.ToJSON User
 instance Aeson.FromJSON User
+
+instance HashDBUser User where
+  userPasswordHash = userPassword
+  setPasswordHash h u = u { userPassword = Just h }
 
 data App = App
   { appConnectionPool :: Persist.Postgresql.ConnectionPool
@@ -200,7 +206,7 @@ postHomeR = do
         setAlert "User not found."
         noUserRedirect
 
-  if (userPassword . Persist.entityVal) user == Just password
+  if Yesod.Auth.HashDB.validatePass (Persist.entityVal user) password == Just True
     then return ()
     else do
       setAlert "Invalid password."
@@ -355,7 +361,8 @@ postRegisterR = do
       setAlert "Name already exists."
       Yesod.redirect RegisterR
 
-  let user = User name (Just password) age
+  let userNoPassword = User name Nothing age
+  user <- Yesod.Auth.HashDB.setPassword password userNoPassword
   userId <- Yesod.runDB $ Persist.insert user
   setSessionUserId userId
   Yesod.redirect AgesR
@@ -368,10 +375,11 @@ populateUsersIfNeeded = do
   stdGen <- Monad.IO.liftIO Random.getStdGen
   let
     ageRange = (10, 100)
-    fakePassword = Just "pwd"
+    fakePassword = "pwd"
     ages = take (length nameList) (Random.randomRs ageRange stdGen)
     nameAgePairs = zip nameList ages
-    users = fmap (\(name, age) -> User name fakePassword age) nameAgePairs
+    usersNoPassword = fmap (\(name, age) -> User name Nothing age) nameAgePairs
+  users <- mapM (Yesod.Auth.HashDB.setPassword fakePassword) usersNoPassword
   existingUser <- Persist.selectList [UserName ==. head nameList] []
   case existingUser of
     [] -> mapM Persist.insert users >> return ()
