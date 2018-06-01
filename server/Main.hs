@@ -16,7 +16,6 @@ import qualified Control.Monad.IO.Class as Monad.IO
 import qualified Control.Monad.Logger as Monad.Logger
 import qualified Control.Monad.Trans.Reader as Monad.Trans.Reader
 import qualified Control.Monad.Trans.Resource as Monad.Trans.Resource
-import           Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Data.String.Interpolate as String.Interpolate
@@ -60,7 +59,7 @@ data App = App
 Yesod.mkYesod "App" [Yesod.parseRoutes|
 / HomeR GET POST
 /ages AgesR GET
-/user CreateUserR POST
+/register RegisterR GET POST
 /static StaticR Static appStatic
 |]
 
@@ -128,8 +127,11 @@ postHomeR = do
     then return ()
     else noUserRedirect
 
-  Yesod.setSessionBS sessionUserIdKey $ (ByteString.Lazy.toStrict . Aeson.encode . Persist.entityKey) user
+  setSessionUserId $ Persist.entityKey user
   Yesod.redirect AgesR
+
+setSessionUserId :: UserId -> Yesod.HandlerFor App ()
+setSessionUserId = Yesod.setSessionBS sessionUserIdKey . ByteString.Lazy.toStrict . Aeson.encode
 
 sessionUserIdKey :: Text
 sessionUserIdKey = "userId"
@@ -207,17 +209,45 @@ Plotly.newPlot('myDiv', data, layout);
 </body>
   |]
 
-postCreateUserR :: Yesod.HandlerFor App Aeson.Value
-postCreateUserR = do
-  userResult <- Yesod.parseCheckJsonBody
-  user :: User <-
-    case userResult of
-      Aeson.Error err -> do
-        $(Monad.Logger.logInfo) $ "postCreateUserR: invalid request " <> Text.pack err
-        Yesod.sendResponseStatus HTTP.Types.status400 $ Aeson.object ["error" .= Aeson.String "Invalid request"]
-      Aeson.Success x -> return x
+getRegisterR :: Yesod.HandlerFor App Yesod.Html
+getRegisterR = do
+  Yesod.sendResponseStatus HTTP.Types.status200 $ RawHtml [String.Interpolate.i|<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+<div style="max-width: 600px; margin: 0 auto;">
+<img src="static/images/wood-spoon-sm.jpg" style="float: left; margin: 0 0 1em 1em;">
+<div style="font-family: sans serif; font-size: 32px">Fantastic Spoon 🥄</div>
+<div style="font-family: sans serif; font-size: 24px">Register</div>
+<form method="post">
+  <div><input type="text" name="name"><div>
+  <div><input type="password" name="password"><div>
+  <div><input type="text" name="age"><div>
+  <div><input type="submit" value="Register"><div>
+</form>
+</div>
+</body>
+|]
+
+postRegisterR :: Yesod.HandlerFor App Aeson.Value
+postRegisterR = do
+  maybeName <- Yesod.lookupPostParam "name"
+  maybePassword <- Yesod.lookupPostParam "password"
+  maybeAge <- Yesod.lookupPostParam "age"
+  (name, password, ageText) <-
+    case pure (,,) <*> maybeName <*> maybePassword <*> maybeAge of
+      Just (name, password, ageText) -> return (name, password, ageText)
+      _ -> Yesod.redirect RegisterR
+  age <-
+    case Text.Read.readMaybe @Int (Text.unpack ageText) of
+      Just age -> return age
+      _ -> Yesod.redirect RegisterR
+  let user = User name (Just password) age
   userId <- Yesod.runDB $ Persist.insert user
-  return $ Aeson.object ["userId" .= Aeson.toJSON userId]
+  setSessionUserId userId
+  Yesod.redirect AgesR
 
 nameList :: [Text]
 nameList = ["olivia","ruby","emily","grace","jessica","chloe","sophie","lily","amelia","evie","mia","ella","charlotte","lucy","megan","ellie","isabelle","isabella","hannah","katie","ava","holly","summer","millie","daisy","phoebe","freya","abigail","poppy","erin","emma","molly","imogen","amy","jasmine","isla","scarlett","leah","sophia","elizabeth","eva","brooke","matilda","caitlin","keira","alice","lola","lilly","amber","isabel","lauren","georgia","gracie","eleanor","bethany","madison","amelie","isobel","paige","lacey","sienna","libby","maisie","anna","rebecca","rosie","tia","layla","maya","niamh","zara","sarah","lexi","maddison","alisha","sofia","skye","nicole","lexie","faith","martha","harriet","zoe","eve","julia","aimee","hollie","lydia","evelyn","alexandra","maria","francesca","tilly","florence","alicia","abbie","emilia","courtney","maryam","esme","jack","oliver","thomas","harry","joshua","alfie","charlie","daniel","james","william","samuel","george","joseph","lewis","ethan","mohammed","dylan","benjamin","alexander","jacob","ryan","liam","jake","max","luke","tyler","callum","matthew","jayden","oscar","archie","adam","riley","harvey","harrison","lucas","muhammad","henry","isaac","leo","connor","edward","finley","logan","noah","cameron","alex","owen","rhys","nathan","jamie","michael","mason","toby","aaron","charles","ben","theo","louis","freddie","finlay","leon","harley","david","mohammad","reece","kian","kai","kyle","brandon","hayden","zachary","kieran","luca","ashton","bailey","sebastian","gabriel","sam","evan","bradley","elliot","john","taylor","joe","corey","reuben","joel","robert","ellis","blake","aidan","louie","christopher","ewan","jay","morgan","billy","sean","zak"]
