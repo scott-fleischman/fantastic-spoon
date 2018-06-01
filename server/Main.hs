@@ -57,6 +57,7 @@ Yesod.mkYesod "App" [Yesod.parseRoutes|
 / HomeR GET POST
 /ages AgesR GET
 /register RegisterR GET POST
+/sign-out SignOutR GET
 |]
 
 instance Yesod.Yesod App
@@ -85,20 +86,64 @@ bootstrapStyles = [String.Interpolate.i|
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
 |]
 
+makeNavBar :: Yesod.HandlerFor App String
+makeNavBar = do
+  render <- Yesod.getUrlRender
+  maybeUserId <- tryGetUserId
+  let
+    navLinkDisabled =
+      case maybeUserId of
+        Just _ -> ""
+        Nothing -> "disabled" :: String
+    agesLink = render AgesR
+    registerLink = render RegisterR
+    signOutLink = render SignOutR
+  return [String.Interpolate.i|
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <a class="navbar-brand" href="#">Fantastic Spoon 🥄</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarNav">
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a class="nav-link #{navLinkDisabled}" href="#{agesLink}">Ages</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#{registerLink}">Register</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link #{navLinkDisabled}" href="#{signOutLink}">Sign Out</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+|]
+
+getSignOutR :: Yesod.HandlerFor App Yesod.Html
+getSignOutR = do
+  Yesod.clearSession
+  noUserRedirect
+
 getHomeR :: Yesod.HandlerFor App Yesod.Html
 getHomeR = do
   maybeUserId <- tryGetUserId
   case maybeUserId of
     Just _ -> Yesod.redirect AgesR
     Nothing -> return ()
+  navBar <- makeNavBar
+  render <- Yesod.getUrlRender
+  let registerLink = render RegisterR
   Yesod.sendResponseStatus HTTP.Types.status200 $ RawHtml [String.Interpolate.i|<!DOCTYPE html>
 <meta charset="utf-8">
 <head>
 #{bootstrapStyles}
 </head>
 <body>
+#{navBar}
 <div class="container" style="width: 800px">
 <h1>Fantastic Spoon 🥄</h1>
+<p>Sign in with your name and password or click <a href="#{registerLink}">Register</a> above to create a new account.</p>
 <form method="post">
   <div class="form-group">
     <label for="userName1">Name</label>
@@ -170,6 +215,7 @@ getAgesR = do
       Just x -> return x
 
   users <- Yesod.runDB $ Persist.selectList [] [Persist.Asc UserAge]
+  navBar <- makeNavBar
   let
     currentAge = userAge currentUser
     userAges = fmap (userAge . Persist.entityVal) users
@@ -189,6 +235,7 @@ getAgesR = do
 <script src="https://cdn.plot.ly/plotly-1.38.1.min.js"></script>
 </head>
 <body>
+#{navBar}
 <div id="myDiv"></div>
 <script>
 var userAges = #{userAgesJS};
@@ -221,12 +268,14 @@ Plotly.newPlot('myDiv', data, layout);
 
 getRegisterR :: Yesod.HandlerFor App Yesod.Html
 getRegisterR = do
+  navBar <- makeNavBar
   Yesod.sendResponseStatus HTTP.Types.status200 $ RawHtml [String.Interpolate.i|<!DOCTYPE html>
 <meta charset="utf-8">
 <head>
 #{bootstrapStyles}
 </head>
 <body>
+#{navBar}
 <div class="container" style="width: 800px">
 <h1>Register 🥄</h1>
 <form method="post">
