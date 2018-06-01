@@ -16,12 +16,14 @@ import           Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Control.Monad.IO.Class as Monad.IO
 import qualified Control.Monad.Logger as Monad.Logger
+import qualified Control.Monad.Trans.Reader as Monad.Trans.Reader
 import qualified Control.Monad.Trans.Resource as Monad.Trans.Resource
 import qualified Data.String.Interpolate as String.Interpolate
 import           Data.Semigroup ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
+import           Database.Persist ((==.))
 import qualified Database.Persist as Persist
 import qualified Database.Persist.Postgresql as Persist.Postgresql
 import qualified Database.Persist.TH as Persist.TH
@@ -57,7 +59,6 @@ data FantasticSpoon = FantasticSpoon
 Yesod.mkYesod "FantasticSpoon" [Yesod.parseRoutes|
 / HomeR GET
 /user CreateUserR POST
-/populate PopulateUsersR POST
 /static StaticR Static appStatic
 |]
 
@@ -145,8 +146,8 @@ postCreateUserR = do
 nameList :: [Text]
 nameList = ["olivia","ruby","emily","grace","jessica","chloe","sophie","lily","amelia","evie","mia","ella","charlotte","lucy","megan","ellie","isabelle","isabella","hannah","katie","ava","holly","summer","millie","daisy","phoebe","freya","abigail","poppy","erin","emma","molly","imogen","amy","jasmine","isla","scarlett","leah","sophia","elizabeth","eva","brooke","matilda","caitlin","keira","alice","lola","lilly","amber","isabel","lauren","georgia","gracie","eleanor","bethany","madison","amelie","isobel","paige","lacey","sienna","libby","maisie","anna","rebecca","rosie","tia","layla","maya","niamh","zara","sarah","lexi","maddison","alisha","sofia","skye","nicole","lexie","faith","martha","harriet","zoe","eve","julia","aimee","hollie","lydia","evelyn","alexandra","maria","francesca","tilly","florence","alicia","abbie","emilia","courtney","maryam","esme","jack","oliver","thomas","harry","joshua","alfie","charlie","daniel","james","william","samuel","george","joseph","lewis","ethan","mohammed","dylan","benjamin","alexander","jacob","ryan","liam","jake","max","luke","tyler","callum","matthew","jayden","oscar","archie","adam","riley","harvey","harrison","lucas","muhammad","henry","isaac","leo","connor","edward","finley","logan","noah","cameron","alex","owen","rhys","nathan","jamie","michael","mason","toby","aaron","charles","ben","theo","louis","freddie","finlay","leon","harley","david","mohammad","reece","kian","kai","kyle","brandon","hayden","zachary","kieran","luca","ashton","bailey","sebastian","gabriel","sam","evan","bradley","elliot","john","taylor","joe","corey","reuben","joel","robert","ellis","blake","aidan","louie","christopher","ewan","jay","morgan","billy","sean","zak"]
 
-postPopulateUsersR :: Yesod.HandlerFor FantasticSpoon Aeson.Value
-postPopulateUsersR = do
+populateUsersIfNeeded :: Monad.Trans.Reader.ReaderT Persist.Postgresql.SqlBackend (Monad.Trans.Resource.ResourceT IO) ()
+populateUsersIfNeeded = do
   stdGen <- Monad.IO.liftIO Random.getStdGen
   let
     ageRange = (10, 100)
@@ -154,10 +155,10 @@ postPopulateUsersR = do
     ages = take (length nameList) (Random.randomRs ageRange stdGen)
     nameAgePairs = zip nameList ages
     users = fmap (\(name, age) -> User name fakePassword age) nameAgePairs
-  Yesod.runDB $ do
-    _ <- mapM Persist.insert users
-    return ()
-  return $ Aeson.object ["usersAdded" .= Aeson.toJSON (length users)]
+  existingUser <- Persist.selectList [UserName ==. head nameList] []
+  case existingUser of
+    [] -> mapM Persist.insert users >> return ()
+    (_ : _) -> return ()
 
 main :: IO ()
 main = do
@@ -170,7 +171,9 @@ main = do
 
     Persist.Postgresql.withPostgresqlPool connectionString openConnectionCount $ \pool -> Monad.IO.liftIO $ do
       let
-        runMigrationAction = Persist.Postgresql.runMigration migrateAll
+        runMigrationAction = do
+          Persist.Postgresql.runMigration migrateAll
+          populateUsersIfNeeded
         runMigrationWithPool = Persist.Postgresql.runSqlPool runMigrationAction pool
       Monad.Trans.Resource.runResourceT runMigrationWithPool
 

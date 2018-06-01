@@ -15,6 +15,7 @@ dependencies:
 - random
 - resourcet
 - text
+- transformers
 - yesod
 - yesod-auth
 - yesod-static
