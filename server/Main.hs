@@ -83,15 +83,17 @@ getHomeR :: Yesod.HandlerFor FantasticSpoon Yesod.Html
 getHomeR = do
   users <- Yesod.runDB $ Persist.selectList [] [Persist.Asc UserAge]
   let
+    currentAge = 25 :: Int
     userAges = fmap (userAge . Persist.entityVal) users
-    userAgesJS =
-      Text.concat
-        [ "["
-        , Text.intercalate "," $ fmap (Text.pack . show) userAges
-        , "]"
-        ]
-    _minAgeJS = Text.pack . show $ minimum userAges
-    _maxAgeJS = Text.pack . show $ maximum userAges
+    makeJSArray items = Text.concat ["[", Text.intercalate "," items, "]"]
+    userAgesJS = makeJSArray $ fmap (Text.pack . show) userAges
+    baseColor = "\"rgba(220, 226, 189, 1)\"" :: Text
+    selectedColor = "\"rgba(147, 192, 164, 1)\"" :: Text
+    start = 10 :: Int
+    end = 100 :: Int
+    step = 5 :: Int
+    bins = [start, start + step .. end]
+    colorsJS = makeJSArray $ fmap (\x -> if currentAge >= x && currentAge < x + step then selectedColor else baseColor) bins
   Yesod.sendResponseStatus HTTP.Types.status200 $ RawHtml [String.Interpolate.i|<!DOCTYPE html>
 <meta charset="utf-8">
 <head>
@@ -105,12 +107,12 @@ var trace = {
   x: userAges,
   type: 'histogram',
   marker: {
-     color: "rgba(220, 226, 189, 1)",
+    color: #{colorsJS},
   },
   name: "All Users",
   xbins: {
     end: 100,
-    size: 5, 
+    size: 5,
     start: 10
   },
   autobinx: false,
