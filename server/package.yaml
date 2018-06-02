@@ -2,24 +2,21 @@ name: fantastic-spoon
 version: 0.1.0
 
 dependencies:
-- aeson
-- base
-- bytestring
-- cryptonite
-- http-types
-- interpolate
-- monad-logger
-- persistent
-- persistent-postgresql
-- persistent-template
-- random
-- resourcet
-- text
-- transformers
-- yesod
-- yesod-auth
-- yesod-auth-hashdb
-- yesod-static
+- aeson # JSON library
+- base # Haskell standard library
+- bytestring # byte processing
+- http-types # definitions of HTTP data structures
+- interpolate # allow multi-line strings in Haskell code with variable interpolation
+- monad-logger # logging utility
+- persistent # database utility
+- persistent-postgresql # PostgreSQL-specific database
+- persistent-template # Create database schemas from Haskell code
+- random # random numbers
+- resourcet # resource aquistion and release at end of code block
+- text # string library
+- transformers # effects library
+- yesod # web server library
+- yesod-auth-hashdb # cryptograph hashing of passwords
 
 ghc-options:
 - -Wall
